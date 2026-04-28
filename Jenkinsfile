@@ -14,7 +14,6 @@ IMAGE_NAME = 'student-web-app:latest'
 
 stages {
 
-```
 stage('Checkout') {
   steps {
     checkout scm
@@ -84,7 +83,6 @@ stage('Deploy container on EC2') {
     }
   }
 }
-```
 
 }
 
