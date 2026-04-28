@@ -10,9 +10,13 @@ pipeline {
         AWS_DEFAULT_REGION = 'ap-south-1'
         TF_IN_AUTOMATION = '1'
         IMAGE_NAME = 'student-web-app:latest'
-        PEM_PATH = 'C:/Users/Sudhir/Downloads/my-ec2-key.pem'   // ✅ CHANGE if needed
-        SCP_PATH = '"C:/Program Files/Git/usr/bin/scp.exe"'     // ✅ Git Bash SCP
-        SSH_PATH = '"C:/Program Files/Git/usr/bin/ssh.exe"'     // ✅ Git Bash SSH
+
+        // ✅ UPDATE THIS PATH (must exist)
+        PEM_PATH = 'C:/Users/Sudhir/Downloads/my-new-key.pem'
+
+        // ✅ Git tools
+        SCP_PATH = 'C:/Program Files/Git/usr/bin/scp.exe'
+        SSH_PATH = 'C:/Program Files/Git/usr/bin/ssh.exe'
     }
 
     stages {
@@ -37,19 +41,11 @@ pipeline {
             }
         }
 
-        stage('Terraform plan') {
+        // ✅ FORCE recreation (VERY IMPORTANT for new key)
+        stage('Force recreate EC2') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
-                ]) {
-                    dir('infra') {
-                        sh """
-                        C:/terraform/terraform.exe plan \
-                        -var="key_name=${KEY_NAME}" \
-                        -var="ssh_public_key_path=${SSH_PUB_KEY_PATH}"
-                        """
-                    }
+                dir('infra') {
+                    sh 'C:/terraform/terraform.exe taint aws_instance.web || true'
                 }
             }
         }
@@ -62,13 +58,10 @@ pipeline {
                 ]) {
                     dir('infra') {
                         sh """
-                        C:/terraform/terraform.exe apply -auto-approve \
-                        -var="key_name=${KEY_NAME}" \
-                        -var="ssh_public_key_path=${SSH_PUB_KEY_PATH}"
+                        C:/terraform/terraform.exe apply -auto-approve -var="key_name=${KEY_NAME}" -var="ssh_public_key_path=${SSH_PUB_KEY_PATH}"
                         """
 
                         script {
-                            // ✅ Store clean IP ONCE
                             env.EC2_PUBLIC_IP = sh(
                                 script: 'C:/terraform/terraform.exe output -raw public_ip',
                                 returnStdout: true
@@ -85,23 +78,17 @@ pipeline {
             steps {
                 script {
 
-                    // ✅ Use stored IP (DON’T call terraform again)
                     def ip = env.EC2_PUBLIC_IP
 
+                    // ✅ Save Docker image
                     sh "docker save ${IMAGE_NAME} -o app.tar"
 
-                    // ✅ Copy file to EC2
-                    sh """
-                    ${SCP_PATH} -o StrictHostKeyChecking=no \
-                    -i ${PEM_PATH} \
-                    app.tar ec2-user@${ip}:/home/ec2-user/
-                    """
+                    // ✅ Copy to EC2 (FIXED QUOTING)
+                    sh "\"${SCP_PATH}\" -o StrictHostKeyChecking=no -i \"${PEM_PATH}\" app.tar ec2-user@${ip}:/home/ec2-user/"
 
-                    // ✅ Run container on EC2
+                    // ✅ Run container (FIXED SSH COMMAND)
                     sh """
-                    ${SSH_PATH} -o StrictHostKeyChecking=no \
-                    -i ${PEM_PATH} \
-                    ec2-user@${ip} "
+                    "${SSH_PATH}" -o StrictHostKeyChecking=no -i "${PEM_PATH}" ec2-user@${ip} "
                         docker load -i app.tar &&
                         docker stop app || true &&
                         docker rm app || true &&
