@@ -68,20 +68,24 @@ stage('Terraform apply') {
 }
 
 stage('Deploy container on EC2') {
-  steps {
-    sh 'docker save ${IMAGE_NAME} -o /tmp/app.tar'
+    steps {
+        script {
+            def ip = sh(script: "C:/terraform/terraform.exe output -raw public_ip", returnStdout: true).trim()
 
-    sshagent(['ec2-ssh-key']) {
-      sh '''
-      scp -o StrictHostKeyChecking=no /tmp/app.tar ec2-user@${EC2_PUBLIC_IP}:/tmp/app.tar
-      ssh -o StrictHostKeyChecking=no ec2-user@${EC2_PUBLIC_IP} "
-        sudo docker load -i /tmp/app.tar &&
-        sudo docker rm -f webapp || true &&
-        sudo docker run -d --name webapp -p 80:3000 -p 3000:3000 ${IMAGE_NAME}
-      "
-      '''
+            sh """
+            docker save student-web-app:latest -o app.tar
+
+            scp -o StrictHostKeyChecking=no -i C:/Users/YourName/Downloads/my-ec2-key.pem app.tar ec2-user@${ip}:/home/ec2-user/
+
+            ssh -o StrictHostKeyChecking=no -i C:/Users/YourName/Downloads/my-ec2-key.pem ec2-user@${ip} '
+                docker load -i app.tar &&
+                docker stop app || true &&
+                docker rm app || true &&
+                docker run -d -p 80:3000 --name app student-web-app:latest
+            '
+            """
+        }
     }
-  }
 }
 
 }
