@@ -10,13 +10,6 @@ pipeline {
         AWS_DEFAULT_REGION = 'ap-south-1'
         TF_IN_AUTOMATION = '1'
         IMAGE_NAME = 'student-web-app:latest'
-
-        // ✅ UPDATE THIS PATH (must exist)
-        PEM_PATH = 'C:/Users/mrsud/Downloads/my-new-key.pem'
-
-        // ✅ Git tools
-        SCP_PATH = 'C:/Program Files/Git/usr/bin/scp.exe'
-        SSH_PATH = 'C:/Program Files/Git/usr/bin/ssh.exe'
     }
 
     stages {
@@ -80,21 +73,21 @@ pipeline {
 
                     def ip = env.EC2_PUBLIC_IP
 
-                    // ✅ Save Docker image
+                    // Save Docker image locally
                     sh "docker save ${IMAGE_NAME} -o app.tar"
 
-                    // ✅ Copy to EC2 (FIXED QUOTING)
-                    sh "\"${SCP_PATH}\" -o StrictHostKeyChecking=no -i \"${PEM_PATH}\" app.tar ec2-user@${ip}:/home/ec2-user/"
-
-                    // ✅ Run container (FIXED SSH COMMAND)
-                    sh """
-                    "${SSH_PATH}" -o StrictHostKeyChecking=no -i "${PEM_PATH}" ec2-user@${ip} "
-                        docker load -i app.tar &&
-                        docker stop app || true &&
-                        docker rm app || true &&
-                        docker run -d -p 80:3000 --name app ${IMAGE_NAME}
-                    "
-                    """
+                    // Use Jenkins SSH credential to copy the image and deploy
+                    sshagent(['ec2-ssh-key']) {
+                        sh "scp -o StrictHostKeyChecking=no app.tar ec2-user@${ip}:/home/ec2-user/"
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ec2-user@${ip} '
+                                docker load -i /home/ec2-user/app.tar &&
+                                docker stop app || true &&
+                                docker rm app || true &&
+                                docker run -d -p 80:3000 --name app ${IMAGE_NAME}
+                            '
+                        """
+                    }
                 }
             }
         }
