@@ -76,17 +76,9 @@ pipeline {
                     // Save Docker image locally
                     sh "docker save ${IMAGE_NAME} -o app.tar"
 
-                    // Use Jenkins SSH credential to copy the image and deploy
-                    sshagent(['ec2-ssh-key']) {
-                        sh "scp -o StrictHostKeyChecking=no app.tar ec2-user@${ip}:/home/ec2-user/"
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@${ip} '
-                                docker load -i /home/ec2-user/app.tar &&
-                                docker stop app || true &&
-                                docker rm app || true &&
-                                docker run -d -p 80:3000 --name app ${IMAGE_NAME}
-                            '
-                        """
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
+                        sh "scp -i '${SSH_KEY_FILE}' -o StrictHostKeyChecking=no app.tar ${SSH_USER}@${ip}:/home/ec2-user/"
+                        sh "ssh -i '${SSH_KEY_FILE}' -o StrictHostKeyChecking=no ${SSH_USER}@${ip} \"docker load -i /home/ec2-user/app.tar && docker stop app || true && docker rm app || true && docker run -d -p 80:3000 --name app ${IMAGE_NAME}\""
                     }
                 }
             }
