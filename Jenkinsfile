@@ -69,41 +69,39 @@ pipeline {
         }
 
         stage('Deploy container on EC2') {
-            steps {
-                script {
+    steps {
+        script {
 
-                    def ip = env.EC2_PUBLIC_IP
+            def ip = env.EC2_PUBLIC_IP
 
-                    // Save Docker image
-                    sh "docker save ${IMAGE_NAME} -o app.tar"
+            sh "docker save ${IMAGE_NAME} -o app.tar"
 
-                    withCredentials([
-                        sshUserPrivateKey(
-                            credentialsId: 'ec2-ssh-key',
-                            keyFileVariable: 'SSH_KEY_FILE',
-                            usernameVariable: 'SSH_USER'
-                        )
-                    ]) {
+            withCredentials([sshUserPrivateKey(
+                credentialsId: 'ec2-ssh-key',
+                keyFileVariable: 'SSH_KEY_FILE',
+                usernameVariable: 'SSH_USER'
+            )]) {
 
-                        // ✅ FIX: Use simple commands (NO icacls, NO chmod issues)
-                        sh """
-                        echo "Copying Docker image to EC2..."
-                        scp -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=no app.tar ${SSH_USER}@${ip}:/home/ec2-user/
+                sh '''
+                echo "Copying Docker image to EC2..."
 
-                        echo "Deploying container on EC2..."
-                        ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=no ${SSH_USER}@${ip} '
-                            sudo systemctl start docker || true
-                            sudo docker load -i /home/ec2-user/app.tar
-                            sudo docker stop app || true
-                            sudo docker rm app || true
-                            sudo docker run -d -p 80:3000 --name app ${IMAGE_NAME}
-                        '
-                        """
-                    }
-                }
+                chmod 600 "$SSH_KEY_FILE" || true
+
+                scp -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no app.tar $SSH_USER@''' + ip + ''':/home/ec2-user/
+
+                echo "Running container on EC2..."
+
+                ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no $SSH_USER@''' + ip + ''' "
+                    docker load -i /home/ec2-user/app.tar &&
+                    docker stop app || true &&
+                    docker rm app || true &&
+                    docker run -d -p 80:3000 --name app student-web-app:latest
+                "
+                '''
             }
         }
     }
+}
 
     post {
         success {
