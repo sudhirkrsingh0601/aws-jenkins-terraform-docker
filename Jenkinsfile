@@ -77,8 +77,12 @@ pipeline {
                     sh "docker save ${IMAGE_NAME} -o app.tar"
 
                     withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
-                        sh "scp -i '${SSH_KEY_FILE}' -o StrictHostKeyChecking=no app.tar ${SSH_USER}@${ip}:/home/ec2-user/"
-                        sh "ssh -i '${SSH_KEY_FILE}' -o StrictHostKeyChecking=no ${SSH_USER}@${ip} \"docker load -i /home/ec2-user/app.tar && docker stop app || true && docker rm app || true && docker run -d -p 80:3000 --name app ${IMAGE_NAME}\""
+                        sh """
+                            cmd.exe /c icacls \"${SSH_KEY_FILE}\" /inheritance:r /grant:r %USERNAME%:R /remove \"BUILTIN\\Users\" /remove \"NT AUTHORITY\\Authenticated Users\" /C
+                            chmod 600 \"${SSH_KEY_FILE}\" || true
+                            scp -i \"${SSH_KEY_FILE}\" -o StrictHostKeyChecking=no app.tar ${SSH_USER}@${ip}:/home/ec2-user/
+                            ssh -i \"${SSH_KEY_FILE}\" -o StrictHostKeyChecking=no ${SSH_USER}@${ip} \"docker load -i /home/ec2-user/app.tar && docker stop app || true && docker rm app || true && docker run -d -p 80:3000 --name app ${IMAGE_NAME}\"
+                        """
                     }
                 }
             }
