@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'KEY_NAME', defaultValue: 'my-ec2-key', description: 'AWS EC2 key pair name')
+        string(name: 'KEY_NAME', defaultValue: 'my-new-key', description: 'AWS EC2 key pair name')
         string(name: 'SSH_PUB_KEY_PATH', defaultValue: 'ssh_key.pub', description: 'Local path to public SSH key')
     }
 
