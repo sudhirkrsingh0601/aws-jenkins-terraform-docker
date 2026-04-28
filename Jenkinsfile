@@ -3,7 +3,7 @@ pipeline {
 
     parameters {
         string(name: 'KEY_NAME', defaultValue: 'my-new-key', description: 'AWS EC2 key pair name')
-        string(name: 'SSH_PUB_KEY_PATH', defaultValue: 'ssh_key.pub', description: 'Local path to public SSH key')
+        string(name: 'SSH_PUB_KEY_PATH', defaultValue: 'infra/ssh_key.pub', description: 'Path to public SSH key (inside repo)')
     }
 
     environment {
@@ -34,7 +34,6 @@ pipeline {
             }
         }
 
-        // ✅ FORCE recreation (VERY IMPORTANT for new key)
         stage('Force recreate EC2') {
             steps {
                 dir('infra') {
@@ -51,7 +50,9 @@ pipeline {
                 ]) {
                     dir('infra') {
                         sh """
-                        C:/terraform/terraform.exe apply -auto-approve -var="key_name=${KEY_NAME}" -var="ssh_public_key_path=${SSH_PUB_KEY_PATH}"
+                        C:/terraform/terraform.exe apply -auto-approve \
+                        -var="key_name=${KEY_NAME}" \
+                        -var="ssh_public_key_path=${SSH_PUB_KEY_PATH}"
                         """
 
                         script {
@@ -73,15 +74,30 @@ pipeline {
 
                     def ip = env.EC2_PUBLIC_IP
 
-                    // Save Docker image locally
+                    // Save Docker image
                     sh "docker save ${IMAGE_NAME} -o app.tar"
 
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
+                    withCredentials([
+                        sshUserPrivateKey(
+                            credentialsId: 'ec2-ssh-key',
+                            keyFileVariable: 'SSH_KEY_FILE',
+                            usernameVariable: 'SSH_USER'
+                        )
+                    ]) {
+
+                        // ✅ FIX: Use simple commands (NO icacls, NO chmod issues)
                         sh """
-                            cmd.exe /c icacls \"${SSH_KEY_FILE}\" /inheritance:r /grant:r %USERNAME%:R /remove \"BUILTIN\\Users\" /remove \"NT AUTHORITY\\Authenticated Users\" /C
-                            chmod 600 \"${SSH_KEY_FILE}\" || true
-                            scp -i \"${SSH_KEY_FILE}\" -o StrictHostKeyChecking=no app.tar ${SSH_USER}@${ip}:/home/ec2-user/
-                            ssh -i \"${SSH_KEY_FILE}\" -o StrictHostKeyChecking=no ${SSH_USER}@${ip} \"docker load -i /home/ec2-user/app.tar && docker stop app || true && docker rm app || true && docker run -d -p 80:3000 --name app ${IMAGE_NAME}\"
+                        echo "Copying Docker image to EC2..."
+                        scp -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=no app.tar ${SSH_USER}@${ip}:/home/ec2-user/
+
+                        echo "Deploying container on EC2..."
+                        ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=no ${SSH_USER}@${ip} '
+                            sudo systemctl start docker || true
+                            sudo docker load -i /home/ec2-user/app.tar
+                            sudo docker stop app || true
+                            sudo docker rm app || true
+                            sudo docker run -d -p 80:3000 --name app ${IMAGE_NAME}
+                        '
                         """
                     }
                 }
