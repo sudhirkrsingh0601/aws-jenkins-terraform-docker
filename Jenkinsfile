@@ -12,7 +12,7 @@ pipeline {
         IMAGE_NAME = 'student-web-app:latest'
 
         // ✅ UPDATE THIS PATH (must exist)
-        PEM_PATH = 'C:/Users/Sudhir/Downloads/my-new-key.pem'
+        PEM_PATH = 'C:/Users/mrsud/Downloads/my-new-key.pem'
 
         // ✅ Git tools
         SCP_PATH = 'C:/Program Files/Git/usr/bin/scp.exe'
