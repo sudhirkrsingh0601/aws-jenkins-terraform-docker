@@ -14,14 +14,11 @@ provider "aws" {
 data "aws_ami" "amazon_linux_2" {
   most_recent = true
 
+  owners = ["amazon"]
+
   filter {
     name   = "name"
     values = ["amzn2-ami-hvm-*-x86_64-gp2"]
-  }
-
-  filter {
-    name   = "owner-alias"
-    values = ["amazon"]
   }
 }
 
@@ -35,7 +32,6 @@ resource "aws_security_group" "web_sg" {
   description = "Allow SSH, HTTP and application traffic"
 
   ingress {
-    description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -43,7 +39,6 @@ resource "aws_security_group" "web_sg" {
   }
 
   ingress {
-    description = "HTTP"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -51,7 +46,6 @@ resource "aws_security_group" "web_sg" {
   }
 
   ingress {
-    description = "App port"
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
