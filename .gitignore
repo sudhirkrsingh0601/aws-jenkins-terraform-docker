@@ -6,3 +6,4 @@ node_modules/
 app.tar
 ssh_key.pub
 .env
+!infra/ssh_key.pub
