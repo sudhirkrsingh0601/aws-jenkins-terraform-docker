@@ -24,7 +24,7 @@ data "aws_ami" "amazon_linux_2" {
 
 resource "aws_key_pair" "deployer" {
   key_name   = var.key_name
-  public_key = file(var.ssh_public_key_path)
+  public_key = file("${path.module}/${var.ssh_public_key_path}")
 }
 
 resource "aws_security_group" "web_sg" {
