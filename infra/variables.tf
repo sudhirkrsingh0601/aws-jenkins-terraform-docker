@@ -18,7 +18,7 @@ variable "key_name" {
 variable "ssh_public_key_path" {
   description = "Path to the public SSH key used by Terraform to create the key pair"
   type        = string
-  default     = "my-new-key.pem"
+  default     = "ssh_key.pub"
 }
 
 variable "allowed_ip" {
