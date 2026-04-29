@@ -3,7 +3,7 @@ pipeline {
 
     parameters {
         string(name: 'KEY_NAME', defaultValue: 'my-new-key', description: 'AWS EC2 key pair name')
-        string(name: 'SSH_PUB_KEY_PATH', defaultValue: 'infra/ssh_key.pub', description: 'Path to public SSH key (inside repo)')
+        string(name: 'SSH_PUB_KEY_PATH', defaultValue: 'ssh_key.pub', description: 'Path to public SSH key (inside infra folder)')
     }
 
     environment {
@@ -69,45 +69,43 @@ pipeline {
         }
 
         stage('Deploy container on EC2') {
-    steps {
-        script {
+            steps {
+                script {
+                    withCredentials([sshUserPrivateKey(
+                        credentialsId: 'ec2-ssh-key',
+                        keyFileVariable: 'SSH_KEY_FILE',
+                        usernameVariable: 'SSH_USER'
+                    )]) {
 
-            def ip = env.EC2_PUBLIC_IP
+                        sh """
+                        echo "Saving Docker image..."
+                        docker save ${IMAGE_NAME} -o app.tar
 
-            sh "docker save ${IMAGE_NAME} -o app.tar"
+                        echo "Fixing SSH key permissions..."
+                        chmod 600 \$SSH_KEY_FILE || true
 
-            withCredentials([sshUserPrivateKey(
-                credentialsId: 'ec2-ssh-key',
-                keyFileVariable: 'SSH_KEY_FILE',
-                usernameVariable: 'SSH_USER'
-            )]) {
+                        echo "Copying image to EC2..."
+                        scp -i \$SSH_KEY_FILE -o StrictHostKeyChecking=no app.tar \$SSH_USER@${env.EC2_PUBLIC_IP}:/home/ec2-user/
 
-                sh '''
-                echo "Copying Docker image to EC2..."
-
-                chmod 600 "$SSH_KEY_FILE" || true
-
-                scp -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no app.tar $SSH_USER@''' + ip + ''':/home/ec2-user/
-
-                echo "Running container on EC2..."
-
-                ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no $SSH_USER@''' + ip + ''' "
-                    docker load -i /home/ec2-user/app.tar &&
-                    docker stop app || true &&
-                    docker rm app || true &&
-                    docker run -d -p 80:3000 --name app student-web-app:latest
-                "
-                '''
+                        echo "Running container on EC2..."
+                        ssh -i \$SSH_KEY_FILE -o StrictHostKeyChecking=no \$SSH_USER@${env.EC2_PUBLIC_IP} '
+                            docker load -i /home/ec2-user/app.tar &&
+                            docker stop app || true &&
+                            docker rm app || true &&
+                            docker run -d -p 80:3000 --name app student-web-app:latest
+                        '
+                        """
+                    }
+                }
             }
         }
     }
-}
 
     post {
         success {
             echo "✅ Deployment complete!"
-            echo "🌐 App URL: http://${EC2_PUBLIC_IP}"
-            echo "🔗 API URL: http://${EC2_PUBLIC_IP}:3000/api/message"
+            echo "🌐 App URL: http://${env.EC2_PUBLIC_IP}"
+            echo "🔗 API URL: http://${env.EC2_PUBLIC_IP}:3000/api/message"
         }
         failure {
             echo "❌ Pipeline failed. Check logs."
