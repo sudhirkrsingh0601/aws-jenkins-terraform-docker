@@ -83,7 +83,7 @@ pipeline {
 
                         echo "Fixing SSH key permissions..."
                         icacls "$SSH_KEY_FILE" /inheritance:r
-                        icacls "$SSH_KEY_FILE" /grant:r "%USERNAME%:R"
+                        icacls "$SSH_KEY_FILE" /grant:r "$USER:R"
 
                         echo "Copying image to EC2..."
                         scp -i \$SSH_KEY_FILE -o StrictHostKeyChecking=no app.tar \$SSH_USER@${env.EC2_PUBLIC_IP}:/home/ec2-user/
