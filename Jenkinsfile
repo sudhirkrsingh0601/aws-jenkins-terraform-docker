@@ -42,8 +42,8 @@ pipeline {
                 ]) {
                     dir('infra') {
                         sh """
-                        C:/terraform/terraform.exe apply -auto-approve ^
-                        -var="key_name=${KEY_NAME}" ^
+                        C:/terraform/terraform.exe apply -auto-approve \
+                        -var="key_name=${KEY_NAME}" \
                         -var="ssh_public_key_path=${SSH_PUB_KEY_PATH}"
                         """
 
