@@ -4,7 +4,7 @@ const url = require("url");
 const PORT = process.env.PORT || 3000;
 
 const products = [
-  { id: 1, name: "Wireless Headphones", price: 1499, emoji: "HEADPHONE" },
+
   { id: 2, name: "Smart Watch", price: 2499, emoji: "WATCH" },
   { id: 3, name: "Bluetooth Speaker", price: 999, emoji: "SPEAKER" },
   { id: 4, name: "Laptop Backpack", price: 799, emoji: "BAG" },
